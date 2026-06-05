@@ -3,9 +3,10 @@ import crypto from 'crypto';
 import { prisma } from '../utils/prisma';
 import logger from '../utils/logger';
 import { sendReminderEmail } from '../integrations/resend';
+import { env } from '../config/env';
 
 export function startReminderScheduler(): void {
-  const schedule = process.env.REMINDER_CRON_SCHEDULE || '*/5 * * * *';
+  const schedule = env.REMINDER_CRON_SCHEDULE;
 
   logger.info('Starting reminder scheduler', { schedule });
 

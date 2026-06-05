@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
+import { UuidParamSchema } from '../../utils/uuid.schema';
 import * as analysisController from './analysis.controller';
 
 const router = Router();
@@ -94,6 +96,6 @@ const router = Router();
  *       502:
  *         description: AI analysis failed after retry (LLM_ERROR)
  */
-router.post('/:id/analyze', authenticate, analysisController.analyzeMeeting);
+router.post('/:id/analyze', authenticate, validate(UuidParamSchema, 'params'), analysisController.analyzeMeeting);
 
 export default router;

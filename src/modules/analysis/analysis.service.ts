@@ -87,7 +87,7 @@ export async function analyzeMeeting(userId: string, meetingId: string, traceId:
 
   // 5. Validate required keys
   for (const key of REQUIRED_KEYS) {
-    if (!analysisData[key]) {
+    if (!Array.isArray(analysisData[key])) {
       logger.error('Gemini response missing required key', { traceId, missingKey: key });
       return { error: 'LLM_ERROR', message: `Missing required key: ${key}` };
     }

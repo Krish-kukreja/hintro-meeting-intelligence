@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
 import { CreateMeetingSchema } from './meetings.schema';
+import { UuidParamSchema } from '../../utils/uuid.schema';
 import * as meetingsController from './meetings.controller';
 
 const router = Router();
@@ -137,6 +138,6 @@ router.get('/', meetingsController.listMeetings);
  *       404:
  *         description: Meeting not found
  */
-router.get('/:id', meetingsController.getMeeting);
+router.get('/:id', validate(UuidParamSchema, 'params'), meetingsController.getMeeting);
 
 export default router;

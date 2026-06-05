@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as actionItemsService from './actionItems.service';
 import { successResponse, errorResponse } from '../../utils/response';
-import { ListActionItemsQuerySchema, UpdateStatusSchema } from './actionItems.schema';
+import { ListActionItemsQuerySchema } from './actionItems.schema';
 
 export async function createActionItem(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -44,13 +44,7 @@ export async function updateStatus(req: Request, res: Response, next: NextFuncti
     const userId = req.userId!;
     const { id } = req.params;
 
-    const parsed = UpdateStatusSchema.safeParse(req.body);
-    if (!parsed.success) {
-      next(parsed.error);
-      return;
-    }
-
-    const result = await actionItemsService.updateStatus(userId, id, parsed.data.status);
+    const result = await actionItemsService.updateStatus(userId, id, req.body.status);
 
     if (result.error === 'NOT_FOUND') {
       res.status(404).json(

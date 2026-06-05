@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
-import { CreateActionItemSchema } from './actionItems.schema';
+import { CreateActionItemSchema, UpdateStatusSchema } from './actionItems.schema';
+import { UuidParamSchema } from '../../utils/uuid.schema';
 import * as actionItemsController from './actionItems.controller';
 
 const router = Router();
@@ -200,6 +201,6 @@ router.get('/', actionItemsController.listActionItems);
  *       404:
  *         description: Action item not found
  */
-router.patch('/:id/status', actionItemsController.updateStatus);
+router.patch('/:id/status', validate(UuidParamSchema, 'params'), validate(UpdateStatusSchema), actionItemsController.updateStatus);
 
 export default router;
