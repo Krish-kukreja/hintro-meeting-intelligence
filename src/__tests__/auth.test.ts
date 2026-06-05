@@ -7,6 +7,7 @@ import { prisma } from '../utils/prisma';
 // Mock Prisma
 jest.mock('../utils/prisma', () => ({
   prisma: {
+    $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
     user: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -19,11 +20,12 @@ jest.mock('../config/env', () => ({
   env: {
     PORT: 3000,
     NODE_ENV: 'test',
-    JWT_SECRET: 'test-jwt-secret-key-for-testing',
+    JWT_SECRET: 'test-jwt-secret-key-for-testing!',
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     GEMINI_API_KEY: 'test-gemini-key',
     RESEND_API_KEY: 'test-resend-key',
     REMINDER_CRON_SCHEDULE: '0 9 * * *',
+    ALLOWED_ORIGINS: 'http://localhost:3000',
   },
 }));
 
@@ -139,7 +141,7 @@ describe('Auth Module', () => {
       expect(res.body).toHaveProperty('traceId');
 
       // Verify token is valid JWT
-      const decoded = jwt.verify(res.body.data.token, 'test-jwt-secret-key-for-testing') as any;
+      const decoded = jwt.verify(res.body.data.token, 'test-jwt-secret-key-for-testing!') as any;
       expect(decoded).toHaveProperty('userId', 'uuid-123');
       expect(decoded).toHaveProperty('email', 'test@example.com');
     });

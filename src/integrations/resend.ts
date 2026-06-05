@@ -11,6 +11,20 @@ interface ActionItemForEmail {
   dueDate: Date | null;
 }
 
+/**
+ * Escape HTML special characters to prevent XSS in email templates.
+ * Covers the OWASP-recommended set: & < > " ' /
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
 export async function sendReminderEmail(
   item: ActionItemForEmail,
   traceId: string
@@ -19,12 +33,17 @@ export async function sendReminderEmail(
     ? item.dueDate.toISOString().split('T')[0]
     : 'Not set';
 
+  // Escape all user-controlled values before embedding in HTML
+  const safeTask = escapeHtml(item.task);
+  const safeAssignee = escapeHtml(item.assignee);
+  const safeDueDate = escapeHtml(dueDateFormatted);
+
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <h2 style="color: #d32f2f;">Action Item Overdue</h2>
-      <p><strong>Task:</strong> ${item.task}</p>
-      <p><strong>Assigned To:</strong> ${item.assignee}</p>
-      <p><strong>Due Date:</strong> ${dueDateFormatted}</p>
+      <p><strong>Task:</strong> ${safeTask}</p>
+      <p><strong>Assigned To:</strong> ${safeAssignee}</p>
+      <p><strong>Due Date:</strong> ${safeDueDate}</p>
       <hr style="border: 1px solid #eee;" />
       <p style="color: #666;">Please update the status of this action item.</p>
     </div>
@@ -34,7 +53,7 @@ export async function sendReminderEmail(
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: item.assignee,
-      subject: `⏰ Overdue: ${item.task}`,
+      subject: `⏰ Overdue: ${safeTask}`,
       html: htmlContent,
     });
 

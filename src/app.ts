@@ -1,11 +1,16 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import hpp from 'hpp';
+import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import { traceIdMiddleware } from './middleware/traceId';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
 import { swaggerSpec } from './config/swagger';
-import { successResponse } from './utils/response';
+import { successResponse, errorResponse } from './utils/response';
+import { env } from './config/env';
+import { prisma } from './utils/prisma';
 import authRoutes from './modules/auth/auth.routes';
 import meetingRoutes from './modules/meetings/meetings.routes';
 import analysisRoutes from './modules/analysis/analysis.routes';
@@ -13,14 +18,79 @@ import actionItemRoutes from './modules/actionItems/actionItems.routes';
 
 const app = express();
 
-// ââ Middleware (EXACT order: cors â json â traceId â requestLogger â routes â errorHandler) ââ
+// ── Trust Proxy (required behind Railway / any reverse proxy for accurate IP) ──
 
-app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.set('trust proxy', 1);
+
+// ── Security Middleware (EXACT order: helmet → cors → hpp → json → traceId → logger → routes → 404 → errorHandler) ──
+
+// Helmet: sets ~15 security headers (CSP, HSTS, X-Frame-Options, etc.)
+app.use(helmet());
+
+// CORS: restrict to allowed origins (not wildcard)
+const ALLOWED_ORIGINS = env.ALLOWED_ORIGINS
+  ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : ['http://localhost:3000'];
+
+app.use(
+  cors({
+    origin: ALLOWED_ORIGINS,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400, // Cache preflight for 24h
+  })
+);
+
+// HPP: protect against HTTP Parameter Pollution
+app.use(hpp());
+
+// Body parser with size limit to prevent payload bombs
+app.use(express.json({ limit: '10kb' }));
+
+// Trace ID and request logging
 app.use(traceIdMiddleware);
 app.use(requestLogger);
 
-// ââ Public Routes ââ
+// ── Rate Limiters ──
+
+// Global: 100 requests per 15 min per IP
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT', message: 'Too many requests, please try again later' },
+  },
+});
+app.use('/api', globalLimiter);
+
+// Auth: 10 attempts per 15 min per IP (brute-force protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT', message: 'Too many authentication attempts, please try again later' },
+  },
+});
+
+// Analysis: 20 per hour per IP (protects Gemini API billing)
+const analysisLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT', message: 'Analysis rate limit exceeded, please try again later' },
+  },
+});
+
+// ── Public Routes ──
 
 /**
  * @swagger
@@ -32,8 +102,16 @@ app.use(requestLogger);
  *       200:
  *         description: Service is running
  */
-app.get('/health', (req, res) => {
-  res.status(200).json(successResponse({ status: 'UP' }, req.traceId));
+app.get('/health', async (req, res) => {
+  // Deep health check: verify DB connectivity
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json(successResponse({ status: 'UP', database: 'connected' }, req.traceId));
+  } catch {
+    res.status(503).json(
+      errorResponse('SERVICE_UNAVAILABLE', 'Database connection failed', req.traceId)
+    );
+  }
 });
 
 /**
@@ -70,21 +148,31 @@ app.get('/api/evaluation', (req, res) => {
   );
 });
 
-// ââ API Documentation ââ
+// ── API Documentation (gated in production) ──
 
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customSiteTitle: 'Hintro API Docs',
-  customCss: '.swagger-ui .topbar { display: none }',
-}));
+if (env.NODE_ENV !== 'production') {
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'Hintro API Docs',
+    customCss: '.swagger-ui .topbar { display: none }',
+  }));
+}
 
-// ââ API Routes (to be mounted in subsequent chunks) ââ
+// ── API Routes ──
 
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/meetings', meetingRoutes);
-app.use('/api/meetings', analysisRoutes);
+app.use('/api/meetings', analysisLimiter, analysisRoutes);
 app.use('/api/action-items', actionItemRoutes);
 
-// ââ Error Handler (MUST be last) ââ
+// ── 404 Catch-All (MUST be after all routes, before error handler) ──
+
+app.use((req, res) => {
+  res.status(404).json(
+    errorResponse('NOT_FOUND', `Route ${req.method} ${req.path} not found`, req.traceId)
+  );
+});
+
+// ── Error Handler (MUST be last) ──
 
 app.use(errorHandler);
 

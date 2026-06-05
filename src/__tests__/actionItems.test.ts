@@ -6,6 +6,7 @@ import { prisma } from '../utils/prisma';
 // Mock Prisma
 jest.mock('../utils/prisma', () => ({
   prisma: {
+    $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
     user: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -38,11 +39,12 @@ jest.mock('../config/env', () => ({
   env: {
     PORT: 3000,
     NODE_ENV: 'test',
-    JWT_SECRET: 'test-jwt-secret-key-for-testing',
+    JWT_SECRET: 'test-jwt-secret-key-for-testing!',
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     GEMINI_API_KEY: 'test-gemini-key',
     RESEND_API_KEY: 'test-resend-key',
     REMINDER_CRON_SCHEDULE: '0 9 * * *',
+    ALLOWED_ORIGINS: 'http://localhost:3000',
   },
 }));
 
@@ -63,7 +65,7 @@ const ACTION_ITEM_ID = 'c0000000-0000-0000-0000-000000000003';
 
 const TEST_JWT = jwt.sign(
   { userId: TEST_USER_ID, email: 'test@example.com' },
-  'test-jwt-secret-key-for-testing',
+  'test-jwt-secret-key-for-testing!',
   { expiresIn: '7d' }
 );
 
