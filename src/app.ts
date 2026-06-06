@@ -60,6 +60,11 @@ app.use(globalLimiter);
  *       200:
  *         description: Service is running
  */
+// Root route for default Railway Healthcheck
+app.get('/', (req, res) => {
+  res.status(200).send('Hintro Meeting Intelligence API is running');
+});
+
 // FIX 15: Deep Health Check
 app.get('/health', async (req, res) => {
   try {

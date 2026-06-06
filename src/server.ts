@@ -7,7 +7,7 @@ import { redis } from './utils/redis';
 
 const PORT = env.PORT;
 
-const server = app.listen(env.PORT, () => {
+const server = app.listen(env.PORT, '0.0.0.0', () => {
   logger.info(`Server running on port ${env.PORT}`);
   
   // Start the reminder cron job
