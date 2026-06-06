@@ -110,13 +110,11 @@ app.get('/api/evaluation', (req, res) => {
   );
 });
 
-// FIX 14: Gate Swagger UI Behind NODE_ENV
-if (env.NODE_ENV !== 'production') {
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: 'Hintro API Docs',
-    customCss: '.swagger-ui .topbar { display: none }',
-  }));
-}
+// FIX 14: Gate Swagger UI (REMOVED GATE: Assignment requires it to be publicly accessible)
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'Hintro API Docs',
+  customCss: '.swagger-ui .topbar { display: none }',
+}));
 
 // ── API Routes ──
 
