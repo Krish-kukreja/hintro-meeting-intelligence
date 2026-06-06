@@ -1,6 +1,7 @@
 import { prisma } from '../../utils/prisma';
 import logger from '../../utils/logger';
 import { CreateMeetingInput, ListMeetingsQuery } from './meetings.schema';
+import { getCache, setCache, invalidatePattern } from '../../utils/redis';
 
 export interface MeetingWithRelations {
   id: string;
@@ -42,6 +43,8 @@ export async function createMeeting(
   });
 
   logger.info('Meeting created successfully', { meetingId: meeting.id, userId });
+
+  await invalidatePattern(`meetings:${userId}:*`);
 
   return meeting;
 }
@@ -94,6 +97,13 @@ export async function listMeetings(
     if (to) where.meetingDate.lte = new Date(to);
   }
 
+  const cacheKey = `meetings:${userId}:page${page}:limit${limit}:from${from || 'all'}:to${to || 'all'}`;
+  const cached = await getCache<PaginatedMeetings>(cacheKey);
+  if (cached) {
+    logger.info('Meetings cache hit', { cacheKey, userId });
+    return cached;
+  }
+
   const [meetings, total] = await Promise.all([
     prisma.meeting.findMany({
       where,
@@ -106,7 +116,7 @@ export async function listMeetings(
 
   logger.info('Meetings listed', { userId, total, returned: meetings.length });
 
-  return {
+  const result = {
     meetings,
     pagination: {
       total,
@@ -115,4 +125,9 @@ export async function listMeetings(
       totalPages: Math.ceil(total / limit),
     },
   };
+
+  await setCache(cacheKey, result, 300); // 5 minutes
+  logger.info('Meetings cache set', { cacheKey, userId });
+
+  return result;
 }

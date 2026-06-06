@@ -3,6 +3,7 @@ import { env } from './config/env';
 import logger from './utils/logger';
 import { startReminderScheduler } from './jobs/reminderScheduler';
 import { prisma } from './utils/prisma';
+import { redis } from './utils/redis';
 
 const PORT = env.PORT;
 
@@ -17,7 +18,8 @@ const gracefulShutdown = (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully`);
   server.close(async () => {
     await prisma.$disconnect();
-    logger.info('Server closed, Prisma disconnected');
+    await redis.quit();
+    logger.info('Server closed, Prisma and Redis disconnected');
     process.exit(0);
   });
 };

@@ -11,10 +11,18 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/hintro_db
       - GEMINI_API_KEY=your-groq-key-here
       - RESEND_API_KEY=your-resend-key-here
+      - REDIS_URL=redis://redis:6379
       - REMINDER_CRON_SCHEDULE=*/5 * * * *
     depends_on:
       - db
     command: sh -c "npx prisma migrate deploy && node dist/server.js"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
 
   db:
     image: postgres:15-alpine
@@ -28,3 +36,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

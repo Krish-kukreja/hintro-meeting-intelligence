@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import logger from '../../utils/logger';
 import { CreateActionItemInput, ListActionItemsQuery } from './actionItems.schema';
+import { getCache, setCache, invalidatePattern } from '../../utils/redis';
 
 export async function createActionItem(userId: string, data: CreateActionItemInput) {
   logger.info('Creating action item', { userId, meetingId: data.meetingId });
@@ -31,6 +32,8 @@ export async function createActionItem(userId: string, data: CreateActionItemInp
 
   logger.info('Action item created', { actionItemId: actionItem.id, meetingId: data.meetingId });
 
+  await invalidatePattern(`actionItems:${userId}:*`);
+
   return { actionItem };
 }
 
@@ -48,6 +51,13 @@ export async function listActionItems(userId: string, query: ListActionItemsQuer
   if (assignee) where.assignee = assignee;
   if (meetingId) where.meetingId = meetingId;
 
+  const cacheKey = `actionItems:${userId}:status${status || 'all'}:assignee${assignee || 'all'}:meeting${meetingId || 'all'}:page${page}:limit${limit}`;
+  const cached = await getCache<{ actionItems: any[], pagination: any }>(cacheKey);
+  if (cached) {
+    logger.info('ActionItems cache hit', { cacheKey, userId });
+    return cached;
+  }
+
   const [actionItems, total] = await Promise.all([
     prisma.actionItem.findMany({
       where,
@@ -61,7 +71,7 @@ export async function listActionItems(userId: string, query: ListActionItemsQuer
     prisma.actionItem.count({ where }),
   ]);
 
-  return {
+  const result = {
     actionItems,
     pagination: {
       total,
@@ -70,6 +80,11 @@ export async function listActionItems(userId: string, query: ListActionItemsQuer
       totalPages: Math.ceil(total / limit),
     },
   };
+
+  await setCache(cacheKey, result, 300);
+  logger.info('ActionItems cache set', { cacheKey, userId });
+
+  return result;
 }
 
 export async function updateStatus(userId: string, actionItemId: string, status: string) {
@@ -92,6 +107,8 @@ export async function updateStatus(userId: string, actionItemId: string, status:
   });
 
   logger.info('Action item status updated', { actionItemId, oldStatus: actionItem.status, newStatus: status });
+
+  await invalidatePattern(`actionItems:${userId}:*`);
 
   return { actionItem: updated };
 }

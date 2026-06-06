@@ -12,6 +12,7 @@ interface EnvConfig {
   GEMINI_API_KEY: string;
   RESEND_API_KEY: string;
   REMINDER_CRON_SCHEDULE: string;
+  REDIS_URL: string;
   ALLOWED_ORIGINS: string;
 }
 
@@ -39,6 +40,7 @@ function validateEnv(): EnvConfig {
     GEMINI_API_KEY: getEnvVar('GEMINI_API_KEY'),
     RESEND_API_KEY: getEnvVar('RESEND_API_KEY'),
     REMINDER_CRON_SCHEDULE: getEnvVar('REMINDER_CRON_SCHEDULE', false) || '*/5 * * * *',
+    REDIS_URL: getEnvVar('REDIS_URL', false) || 'redis://localhost:6379',
     ALLOWED_ORIGINS: getEnvVar('ALLOWED_ORIGINS', false) || 'http://localhost:3000',
   };
 }
