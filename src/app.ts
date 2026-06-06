@@ -40,7 +40,7 @@ app.use(requestLogger);
 // FIX 6: Global Rate Limiter
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window`
+  max: 10000, // Increased to 10,000 so you don't get blocked while recording the video!
   message: 'Too many requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
